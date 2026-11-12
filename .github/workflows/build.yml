@@ -1,0 +1,127 @@
+name: Build Memory Saver
+
+# Works in two cases:
+#  (a) the repo contains the normal folders (desktop, mobile, ...), or
+#  (b) the repo contains just the project .zip file in its root (it is unpacked automatically).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project (if a zip was uploaded)
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem -Path . -Filter *.zip | Select-Object -First 1
+          $root = (Get-Location).Path
+          if ($zip) {
+            Expand-Archive -Path $zip.FullName -DestinationPath _src -Force
+            $d = Get-ChildItem _src -Recurse -Directory -Filter desktop | Select-Object -First 1
+            $root = $d.Parent.FullName
+          }
+          "ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create Windows project files
+        working-directory: ${{ env.ROOT }}/desktop
+        run: flutter create --platforms=windows .
+      - name: Add permissions
+        working-directory: ${{ env.ROOT }}
+        run: dart tools/prepare_platforms.dart
+      - name: Build Windows app
+        working-directory: ${{ env.ROOT }}/desktop
+        run: |
+          flutter pub get
+          flutter build windows --release
+      - name: Build Setup.exe (Inno Setup)
+        working-directory: ${{ env.ROOT }}
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\windows\setup.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MemorySaver-Windows-Setup
+          path: ${{ env.ROOT }}/dist/MemorySaver-Setup.exe
+
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project (if a zip was uploaded)
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem -Path . -Filter *.zip | Select-Object -First 1
+          $root = (Get-Location).Path
+          if ($zip) {
+            Expand-Archive -Path $zip.FullName -DestinationPath _src -Force
+            $d = Get-ChildItem _src -Recurse -Directory -Filter desktop | Select-Object -First 1
+            $root = $d.Parent.FullName
+          }
+          "ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create Android project files
+        working-directory: ${{ env.ROOT }}/mobile
+        run: flutter create --platforms=android .
+      - name: Add permissions
+        working-directory: ${{ env.ROOT }}
+        run: dart tools/prepare_platforms.dart
+      - name: Build APK
+        working-directory: ${{ env.ROOT }}/mobile
+        run: |
+          flutter pub get
+          flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MemorySaver-Android-APK
+          path: ${{ env.ROOT }}/mobile/build/app/outputs/flutter-apk/app-release.apk
+
+  mac-dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack project (if a zip was uploaded)
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem -Path . -Filter *.zip | Select-Object -First 1
+          $root = (Get-Location).Path
+          if ($zip) {
+            Expand-Archive -Path $zip.FullName -DestinationPath _src -Force
+            $d = Get-ChildItem _src -Recurse -Directory -Filter desktop | Select-Object -First 1
+            $root = $d.Parent.FullName
+          }
+          "ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create macOS project files
+        working-directory: ${{ env.ROOT }}/desktop
+        run: flutter create --platforms=macos .
+      - name: Add permissions
+        working-directory: ${{ env.ROOT }}
+        run: dart tools/prepare_platforms.dart
+      - name: Build macOS app and DMG
+        working-directory: ${{ env.ROOT }}
+        run: |
+          (cd desktop && flutter pub get && flutter build macos --release)
+          mkdir -p dist
+          hdiutil create -volname "Memory Saver" -srcfolder desktop/build/macos/Build/Products/Release/memory_saver_desktop.app -ov -format UDZO dist/MemorySaver.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MemorySaver-Mac-DMG
+          path: ${{ env.ROOT }}/dist/MemorySaver.dmg
