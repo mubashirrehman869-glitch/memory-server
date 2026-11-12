@@ -1,0 +1,12 @@
+1. Make a free account at github.com, then New repository (name: memory-saver, Private).
+2. Unzip this zip. Open the "memory_saver" folder. Select EVERYTHING inside it
+   (desktop, mobile, installer, tools, README.md ...) and drag into the repository page
+   ("uploading an existing file"), then press "Commit changes".
+3. If the folder ".github" was not uploaded: Add file > Create new file, type the name
+   .github/workflows/build.yml  (typing "/" makes folders) and paste the full text of
+   github_workflow_build.yml, then Commit.
+4. Open the "Actions" tab > "Build Memory Saver" > "Run workflow" (green button).
+   If asked, click "I understand my workflows, go ahead and enable them".
+5. Wait about 15-25 minutes. Open the finished run (green tick) and download from "Artifacts":
+   MemorySaver-Windows-Setup (setup .exe), MemorySaver-Android-APK (phone), MemorySaver-Mac-DMG.
+6. If a job fails (red cross): open it, copy the last red error lines, and send them to Claude.
